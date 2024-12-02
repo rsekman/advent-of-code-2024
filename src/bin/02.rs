@@ -7,36 +7,38 @@ fn within_tolerance(prev: i32, new: i32) -> bool {
     1 <= d && d <= 3
 }
 
-fn is_safe(log: &Vec<i32>) -> bool {
+fn is_safe(log: &Vec<i32>, dampener: bool) -> bool {
     let mut ord: Option<Ordering> = None;
     let mut prev: Option<i32> = None;
 
-    for new in log {
-        let tolerated = prev.map(|x| within_tolerance(x, *new)).unwrap_or(true);
-        let correct_order = prev
-            .zip(ord)
-            .map(|(p, o)| new.cmp(&p) == o)
-            .unwrap_or(true);
+    for (i, cur) in log.into_iter().enumerate() {
+        let tolerated = prev.map(|x| within_tolerance(x, *cur)).unwrap_or(true);
+        let correct_order = prev.zip(ord).map(|(p, o)| cur.cmp(&p) == o).unwrap_or(true);
         if !(tolerated && correct_order) {
-            return false;
+            if !dampener {
+                return false;
+            } else {
+                for k in 0..(i + 1) {
+                    /* Three values are involved in accepting the current level: the current level,
+                     * the previous level, and the level before that. This is because we need
+                     *     sign(x-y) == sign(y-z).
+                     * If the current level is rejected, we retry, in turn, with each of these three values
+                     * dropped.
+                     */
+                    let mut dropped = Vec::new();
+                    dropped.append(&mut log[..i - k].to_vec());
+                    dropped.append(&mut log[i - k + 1..].to_vec());
+                    if is_safe(&dropped, false) {
+                        return true;
+                    }
+                }
+                return false;
+            }
         }
-        ord = ord.or(prev.map(|x| new.cmp(&x)));
-        prev = Some(*new);
+        ord = ord.or(prev.map(|x| cur.cmp(&x)));
+        prev = Some(*cur);
     }
     true
-}
-
-// Ugly O(n^2) solution, probably not optimal
-fn is_safe_damped(log: &Vec<i32>) -> bool {
-    for n in 0..log.len() {
-        let mut head = log[..n].to_vec();
-        let mut tail = log[n + 1..].to_vec();
-        head.append(&mut tail);
-        if is_safe(&head) {
-            return true;
-        }
-    }
-    false
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -51,10 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         for entry in line.split_whitespace() {
             report.push(entry.parse()?);
         }
-        if is_safe(&report) {
+        if is_safe(&report, false) {
             safe += 1;
         }
-        if is_safe_damped(&report) {
+        if is_safe(&report, true) {
             safe_with_dampener += 1;
         }
     }
