@@ -7,5 +7,9 @@ edition = "2021"
 name = "01"
 test = false
 
+[[bin]]
+name = "02"
+test = false
+
 [dependencies]
 regex = "1.0.0"
