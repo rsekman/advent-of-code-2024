@@ -1,4 +1,5 @@
 use regex::Regex;
+use std::error::Error;
 use std::io::prelude::*;
 use std::iter::zip;
 
@@ -7,9 +8,9 @@ use std::collections::HashMap;
 fn parse_line(s: &str) -> Option<(i32, i32)> {
     let r = Regex::new(r"^(\d+)\s+(\d+)$").ok()?;
     let caps = r.captures(s)?;
-    let a = caps.get(1)?.as_str().parse().ok()?;
-    let b = caps.get(2)?.as_str().parse().ok()?;
-    Some((a, b))
+    let a = caps.get(1)?.as_str().parse().ok();
+    let b = caps.get(2)?.as_str().parse().ok();
+    a.zip(b)
 }
 
 fn sorted_unstable<T: Clone + Ord>(vec: &Vec<T>) -> Vec<T> {
@@ -41,7 +42,7 @@ fn similarity_score(in_a: &Vec<i32>, in_b: &Vec<i32>) -> i32 {
     score
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let stdin = std::io::stdin();
     let stdin = stdin.lock();
 
@@ -49,24 +50,13 @@ fn main() {
     let mut vb: Vec<i32> = Vec::new();
 
     for line in stdin.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("Failed to read from stdin: {}", e);
-                return;
-            }
-        };
-        let parsed = parse_line(&line);
-        match parsed {
-            Some((a, b)) => {
+        let line = line?;
+        parse_line(&line)
+            .map(|(a, b)| {
                 va.push(a);
                 vb.push(b);
-            }
-            None => {
-                eprintln!("Failed to parse line: {}", line);
-                return;
-            }
-        }
+            })
+            .ok_or(format!("Failed to parse line: {}", line))?;
     }
 
     let dist = distance(&va, &vb);
@@ -74,4 +64,6 @@ fn main() {
 
     let sim_score = similarity_score(&va, &vb);
     println!("Similarity score: {}", sim_score);
+
+    return Ok(());
 }
