@@ -16,18 +16,14 @@ fn get_in_grid(grid: &Grid, (x, y): Point) -> Option<&char> {
 fn search_for_xmas(grid: &Grid, mut p: Point, dp: Delta) -> bool {
     let xmas = "XMAS";
     let mut found = String::from("");
-    for _ in xmas.chars() {
-        let l = get_in_grid(&grid, p);
-        if let Some(x) = l {
-            found.push(*x);
-        }
-        if let Some(next) = step(p, dp) {
-            p = next;
-        } else {
-            break;
+    while let Some(l) = get_in_grid(&grid, p) {
+        found.push(*l);
+        match step(p, dp) {
+            Some(q) => p = q,
+            None => break,
         }
     }
-    found == xmas
+    found.starts_with(xmas)
 }
 
 fn find_xmas(grid: &Grid, start: Point) -> u32 {
