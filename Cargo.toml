@@ -15,5 +15,9 @@ test = false
 name = "03"
 test = false
 
+[[bin]]
+name = "04"
+test = false
+
 [dependencies]
 regex = "1.0.0"
