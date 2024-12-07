@@ -12,14 +12,7 @@ type Update = Vec<u32>;
 fn restrict_topological_order(vs: HashSet<u32>, full: &TopologicalOrder) -> TopologicalOrder {
     let get_or_empty = |v| full.get(v).cloned().unwrap_or(HashSet::new());
     vs.iter()
-        .map(|v| {
-            (
-                *v,
-                HashSet::intersection(&vs, &get_or_empty(v))
-                    .copied()
-                    .collect(),
-            )
-        })
+        .map(|v| (*v, vs.intersection(&get_or_empty(v)).copied().collect()))
         .collect()
 }
 
