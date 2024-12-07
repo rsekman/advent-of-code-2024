@@ -5,13 +5,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stdin = std::io::stdin();
     let stdin = stdin.lock();
 
+    let mut answer = 0;
     for line in stdin.lines() {
         let line = line?;
-
-        let mut answer = 0;
         // BODY
-        println!("The answer is: {}", answer);
     }
+    println!("The answer is: {}", answer);
 
     return Ok(());
 }
