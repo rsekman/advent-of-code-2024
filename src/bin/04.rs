@@ -49,10 +49,9 @@ fn find_xmas(grid: &Grid, start: Point) -> u32 {
 fn word_along_vec(grid: &Grid, center: Point, vec: Vec<Delta>) -> String {
     let mut word = String::from("");
     for dx in vec {
-        match step(center, dx).and_then(|p| get_in_grid(&grid, p)) {
-            Some(c) => word.push(*c),
-            _ => continue,
-        }
+        step(center, dx)
+            .and_then(|p| get_in_grid(&grid, p))
+            .map(|c| word.push(*c));
     }
     word
 }
@@ -79,9 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let line = line?;
         g.push(vec![]);
         let row = g.last_mut().unwrap();
-        for c in line.chars() {
-            row.push(c);
-        }
+        row.extend(line.chars());
     }
 
     let mut xmas_count = 0;
