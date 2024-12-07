@@ -3,21 +3,6 @@ name = "advent-of-code-2024"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "01"
-test = false
-
-[[bin]]
-name = "02"
-test = false
-
-[[bin]]
-name = "03"
-test = false
-
-[[bin]]
-name = "04"
-test = false
-
 [dependencies]
 regex = "1.0.0"
+itertools = "*"

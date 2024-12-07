@@ -1,25 +1,25 @@
 use std::error::Error;
 use std::io::prelude::*;
 
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::VecDeque;
 
-type TopologicalOrder = HashMap<u32, HashSet<u32>>;
+type TopologicalOrder = BTreeMap<u32, BTreeSet<u32>>;
 
 type Update = Vec<u32>;
 
-fn restrict_topological_order(vs: HashSet<u32>, full: &TopologicalOrder) -> TopologicalOrder {
-    let get_or_empty = |v| full.get(v).cloned().unwrap_or(HashSet::new());
+fn restrict_topological_order(vs: &BTreeSet<u32>, full: &TopologicalOrder) -> TopologicalOrder {
+    let get_or_empty = |v| full.get(v).cloned().unwrap_or_else(BTreeSet::new);
     vs.iter()
         .map(|v| (*v, vs.intersection(&get_or_empty(v)).copied().collect()))
         .collect()
 }
 
 fn is_topologically_sorted(upd: &Update, order: &TopologicalOrder) -> bool {
-    let mut dag = restrict_topological_order(HashSet::from_iter(upd.iter().cloned()), order);
+    let mut dag = restrict_topological_order(&BTreeSet::from_iter(upd.iter().copied()), order);
     for v in upd {
-        if dag.get(&v).map(HashSet::len).unwrap_or(0) > 0 {
+        if dag.get(&v).map(BTreeSet::len).unwrap_or(0) > 0 {
             return false;
         }
         for (_, deps) in dag.iter_mut() {
@@ -29,26 +29,28 @@ fn is_topologically_sorted(upd: &Update, order: &TopologicalOrder) -> bool {
     true
 }
 
-fn visit(v: u32, vs: &mut HashSet<u32>, dag: &TopologicalOrder, out: &mut VecDeque<u32>) {
-    if !vs.contains(&v) {
-        return;
-    }
-    for u in dag.get(&v).cloned().unwrap_or(HashSet::new()) {
-        visit(u, vs, dag, out)
-    }
-    vs.remove(&v);
-    out.push_front(v);
-}
-
 fn sort_topologically(upd: &Update, order: &TopologicalOrder) -> Update {
-    let mut vs = HashSet::from_iter(upd.iter().cloned());
-    let dag = restrict_topological_order(vs.clone(), order);
+    let mut vs = BTreeSet::from_iter(upd.iter().copied());
+    let mut dag = restrict_topological_order(&vs, order);
 
+    let mut stack = upd.clone();
     let mut out = VecDeque::new();
-    for v in vs.clone() {
-        visit(v, &mut vs, &dag, &mut out);
+    while stack.len() > 0 {
+        let &v = stack.last().unwrap();
+        if !vs.contains(&v) {
+            stack.pop();
+            continue;
+        }
+        //println!("Considering {}", v);
+        if let Some(d) = dag.get_mut(&v).and_then(|x| x.pop_first()) {
+            stack.push(d);
+        } else {
+            out.push_front(v);
+            stack.pop();
+            vs.remove(&v);
+        }
     }
-    out.into_iter().collect()
+    out.into_iter().rev().collect()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -74,7 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(s) = order.get_mut(&after) {
             s.insert(before);
         } else {
-            order.insert(after, HashSet::from([before]));
+            order.insert(after, BTreeSet::from([before]));
         };
     }
 
