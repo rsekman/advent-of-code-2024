@@ -4,7 +4,7 @@ use std::io::prelude::*;
 use itertools::Itertools;
 use std::collections::{HashSet, VecDeque};
 
-fn find_peaks(map: &Vec<Vec<u8>>, trailhead: (usize, usize)) -> usize {
+fn find_trails_iter(map: &Vec<Vec<u8>>, trailhead: (usize, usize), unique: bool) -> usize {
     let height = map.len();
     let width = map[0].len();
     let valid = |c: (usize, usize)| c.0 < width && c.1 < height;
@@ -14,10 +14,10 @@ fn find_peaks(map: &Vec<Vec<u8>>, trailhead: (usize, usize)) -> usize {
     let mut n_peaks = 0;
     queue.push_back(trailhead);
     while let Some((x, y)) = queue.pop_front() {
-        if visited.contains(&(x, y)) {
+        if visited.contains(&(x, y)) && !unique {
             continue;
         }
-        for d in vec![(x + 1, x), (x - 1, y), (x, y - 1), (x, y + 1)] {
+        for d in vec![(x + 1, y), (x - 1, y), (x, y - 1), (x, y + 1)] {
             if valid(d) && map[d.1][d.0] == map[y][x] + 1 {
                 queue.push_back(d);
             }
@@ -30,7 +30,8 @@ fn find_peaks(map: &Vec<Vec<u8>>, trailhead: (usize, usize)) -> usize {
     n_peaks
 }
 
-fn find_trails(map: &Vec<Vec<u8>>, (x, y): (usize, usize)) -> usize {
+#[allow(dead_code)]
+fn find_trails_recur(map: &Vec<Vec<u8>>, (x, y): (usize, usize)) -> usize {
     if map[y][x] == 9 {
         1
     } else {
@@ -40,7 +41,7 @@ fn find_trails(map: &Vec<Vec<u8>>, (x, y): (usize, usize)) -> usize {
         vec![(x + 1, y), (x - 1, y), (x, y - 1), (x, y + 1)]
             .iter()
             .filter(|&&d| valid(d) && map[d.1][d.0] == map[y][x] + 1)
-            .map(|d| find_trails(&map, *d))
+            .map(|d| find_trails_recur(&map, *d))
             .sum()
     }
 }
@@ -68,14 +69,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!(
         "Total score of hiking map: {}",
-        trailheads.iter().map(|h| find_peaks(&v, *h)).sum::<usize>()
+        trailheads
+            .iter()
+            .map(|h| find_trails_iter(&v, *h, false))
+            .sum::<usize>()
     );
 
     println!(
         "Total rating of hiking map: {}",
         trailheads
             .iter()
-            .map(|h| find_trails(&v, *h))
+            .map(|h| find_trails_iter(&v, *h, true))
             .sum::<usize>()
     );
 

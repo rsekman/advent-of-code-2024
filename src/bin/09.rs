@@ -6,11 +6,10 @@ use itertools::repeat_n;
 use itertools::Itertools;
 
 fn checksum<'a, T: Iterator<Item = &'a Option<u64>>>(disk: T) -> u64 {
-    disk.enumerate()
-        .fold(0, |acc, (pos, block)| match block {
-            Some(file_id) => acc + (pos as u64) * file_id,
-            None => acc
-        })
+    disk.enumerate().fold(0, |acc, (pos, block)| match block {
+        Some(file_id) => acc + (pos as u64) * file_id,
+        None => acc,
+    })
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -81,7 +80,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // try to find somewhere to put the current file
             if !moved.contains(&f) {
                 let file_size = file_end - back;
-                match unoccupied.iter().find_position(|(pos, n)| *n >= file_size && *pos < back) {
+                match unoccupied
+                    .iter()
+                    .find_position(|(pos, n)| *n >= file_size && *pos < back)
+                {
                     Some((chunk_idx, (pos, len))) => {
                         for n in 0..file_size {
                             defrag[pos + n] = defrag[file_end - n];
