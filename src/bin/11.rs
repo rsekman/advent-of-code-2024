@@ -2,30 +2,9 @@ use std::error::Error;
 use std::io::prelude::*;
 
 use itertools::Itertools;
-
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 type PebbleValue = u64;
-#[derive(Eq, PartialEq, Hash, Ord, PartialOrd, Debug)]
-struct Pebble {
-    value: PebbleValue,
-    children: PebbleChildren,
-}
-type PebbleChildren = (Option<PebbleValue>, Option<PebbleValue>);
-
-fn blink(v: PebbleValue, seen: &mut BTreeMap<PebbleValue, PebbleChildren>) -> PebbleChildren {
-    let (left, right) = if v == 0 {
-        (Some(1), None)
-    } else if v.ilog10() % 2 == 1 {
-        let (l, r) = split_pebble(v);
-        (Some(l), Some(r))
-    } else {
-        (Some(2024 * v), None)
-    };
-    seen.entry(v).or_insert((left, right));
-    (left, right)
-}
-
 fn split_pebble(p: PebbleValue) -> (PebbleValue, PebbleValue) {
     let n = 10u64.pow((p.ilog10() + 1) / 2);
     (p / n, p % n)
@@ -34,38 +13,32 @@ fn split_pebble(p: PebbleValue) -> (PebbleValue, PebbleValue) {
 fn n_descendants(
     p: PebbleValue,
     max_depth: usize,
-    mut seen: &mut BTreeMap<PebbleValue, PebbleChildren>,
     cache: &mut BTreeMap<(PebbleValue, usize), usize>,
 ) -> usize {
-    do_n_descendants(p, 0, max_depth, seen, cache)
+    do_n_descendants(p, 0, max_depth, cache)
 }
 
 fn do_n_descendants(
     v: PebbleValue,
     depth: usize,
     max_depth: usize,
-    mut seen: &mut BTreeMap<PebbleValue, PebbleChildren>,
     mut cache: &mut BTreeMap<(PebbleValue, usize), usize>,
 ) -> usize {
+    let mut get = |x| {
+        cache
+            .get(&(x, max_depth - depth - 1))
+            .map(|r| *r)
+            .unwrap_or_else(|| do_n_descendants(x, depth + 1, max_depth, &mut cache))
+    };
     let out = if depth < max_depth {
-        let (left, right) = blink(v, seen);
-        let left_descendants = if let Some(x) = left {
-            cache
-                .get(&(x, max_depth - depth - 1))
-                .map(|r| *r)
-                .unwrap_or_else(|| do_n_descendants(x, depth + 1, max_depth, &mut seen, &mut cache))
+        if v == 0 {
+            get(1)
+        } else if v.ilog10() % 2 == 1 {
+            let (left, right) = split_pebble(v);
+            get(left) + get(right)
         } else {
-            0
-        };
-        let right_descendants = if let Some(x) = right {
-            cache
-                .get(&(x, max_depth - depth - 1))
-                .map(|r| *r)
-                .unwrap_or_else(|| do_n_descendants(x, depth + 1, max_depth, &mut seen, &mut cache))
-        } else {
-            0
-        };
-        left_descendants + right_descendants
+            get(2024 * v)
+        }
     } else {
         1
     };
@@ -84,27 +57,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(&str::parse::<PebbleValue>)
         .collect::<Result<Vec<PebbleValue>, _>>()?;
 
-    let mut seen = BTreeMap::<PebbleValue, PebbleChildren>::new();
     let mut cache = BTreeMap::<(PebbleValue, usize), usize>::new();
 
     let short = 25;
     let descs_short: usize = ps
         .iter()
-        .map(|p| n_descendants(*p, short, &mut seen, &mut cache))
+        .map(|p| n_descendants(*p, short, &mut cache))
         .sum();
     println!(
         "After {short} blinks: {descs_short} ({} unique values)",
-        seen.len()
+        cache.keys().sorted().unique_by(|c| c.0).count()
     );
 
     let long = 75;
-    let descs_long: usize = ps
-        .iter()
-        .map(|p| n_descendants(*p, long, &mut seen, &mut cache))
-        .sum();
+    let descs_long: usize = ps.iter().map(|p| n_descendants(*p, long, &mut cache)).sum();
     println!(
         "After {long} blinks: {descs_long} ({} unique values)",
-        seen.len()
+        cache.keys().sorted().unique_by(|c| c.0).count()
     );
 
     return Ok(());
