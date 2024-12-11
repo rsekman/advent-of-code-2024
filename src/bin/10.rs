@@ -69,7 +69,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!(
         "Total score of hiking map: {}",
-        trailheads.iter().map(|h| find_trails_iter(&v, *h, false)).sum::<usize>()
+        trailheads
+            .iter()
+            .map(|h| find_trails_iter(&v, *h, false))
+            .sum::<usize>()
     );
 
     println!(
