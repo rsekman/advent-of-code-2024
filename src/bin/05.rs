@@ -3,8 +3,6 @@ use std::io::prelude::*;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::VecDeque;
-
 type TopologicalOrder = BTreeMap<u32, BTreeSet<u32>>;
 
 type Update = Vec<u32>;
@@ -34,23 +32,25 @@ fn sort_topologically(upd: &Update, order: &TopologicalOrder) -> Update {
     let mut dag = restrict_topological_order(&vs, order);
 
     let mut stack = upd.clone();
-    let mut out = VecDeque::new();
+    let mut out = Vec::new();
+    let mut visit = |n| out.push(n);
     while stack.len() > 0 {
         let &v = stack.last().unwrap();
         if !vs.contains(&v) {
             stack.pop();
             continue;
         }
-        //println!("Considering {}", v);
         if let Some(d) = dag.get_mut(&v).and_then(|x| x.pop_first()) {
+            // Take one child of the node and push it onto the stack
             stack.push(d);
         } else {
-            out.push_front(v);
+            // If the node is a leaf, process it
+            visit(v);
             stack.pop();
             vs.remove(&v);
         }
     }
-    out.into_iter().rev().collect()
+    out
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
