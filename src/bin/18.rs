@@ -107,14 +107,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("The shortest path is {dist:?} steps long.");
 
-    let mut map = BTreeSet::new();
-    for b in bytes {
-        map.insert(b);
-        if dijkstra(&start, &end, (w, h), &map).is_none() {
-            println!("The first byte that cuts off the path to the exit is {b}.");
-            break;
-        }
-    }
+    let ns = Vec::from_iter(0..bytes.len());
+    let cutoff = ns.as_slice().partition_point(|n| {
+        dijkstra(
+            &start,
+            &end,
+            (w, h),
+            &BTreeSet::from_iter(bytes.iter().take(*n).cloned()),
+        )
+        .is_some()
+    }) - 1;
+    println!(
+        "The first byte that cuts off the path to the exit is #{cutoff} {}.",
+        bytes[cutoff]
+    );
 
     return Ok(());
 }
