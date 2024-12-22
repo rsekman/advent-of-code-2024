@@ -13,6 +13,7 @@ itertools = "*"
 nom = "7.0.0"
 num = "*"
 rayon = "1.10"
+nonempty = "0.11"
 
 [dependencies.coordinates]
 path = "../../coordinates.rs"
