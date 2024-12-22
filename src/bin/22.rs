@@ -1,8 +1,10 @@
+#![feature(map_try_insert)]
 use std::error::Error;
 use std::io::prelude::*;
 
 use itertools::Itertools;
 use rayon::prelude::*;
+use std::collections::BTreeMap;
 
 type DiffSeq = (i64, i64, i64, i64);
 
@@ -24,48 +26,42 @@ fn secrets(seed: u64, n_folds: usize) -> impl Iterator<Item = u64> {
     })
 }
 
-fn find_buy(secrets: &Vec<u64>, diffs: &Vec<DiffSeq>, seq: &DiffSeq) -> u64 {
-    if let Some(idx) = diffs.iter().position(|s| s == seq) {
-        secrets[idx + 4]
-    } else {
-        return 0;
+fn buys(secrets: &Vec<u64>) -> BTreeMap<DiffSeq, u64> {
+    let diffs = secrets
+        .iter()
+        .tuple_windows()
+        .map(|(y, x)| x.wrapping_sub(*y) as i64)
+        .tuple_windows::<DiffSeq>();
+    let prices = Iterator::zip(diffs, secrets.iter().skip(4));
+    let mut map = BTreeMap::new();
+    for (k, v) in prices {
+        let _ = map.try_insert(k, *v);
     }
+    map
 }
 
-fn total_buys(secrets: &Vec<Vec<u64>>, diffs: &Vec<Vec<DiffSeq>>, seq: &DiffSeq) -> u64 {
-    Iterator::zip(secrets.iter(), diffs.iter())
-        .map(|(ss, ds)| find_buy(ss, ds, seq))
-        .sum()
+fn sum_by_key(prices: &Vec<BTreeMap<DiffSeq, u64>>) -> BTreeMap<DiffSeq, u64> {
+    let mut out = BTreeMap::new();
+    for ps in prices {
+        for (&k, &v) in ps {
+            let r = out.entry(k).or_insert(0);
+            *r += v;
+        }
+    }
+    out
 }
 
 fn maximize_buys(seeds: Vec<u64>, n_folds: usize) -> (u64, Option<DiffSeq>) {
-    let secrets = seeds
-        .iter()
-        .map(|&s| secrets(s, n_folds).collect_vec())
-        .collect_vec();
-
-    let diffs = secrets
-        .iter()
-        .map(|ss| {
-            ss.iter()
-                .tuple_windows()
-                .map(|(y, x)| x.wrapping_sub(*y) as i64)
-                .tuple_windows::<DiffSeq>()
-                .collect_vec()
-        })
-        .collect_vec();
-
-    let seqs = itertools::repeat_n(-9..=9, 4)
-        .multi_cartesian_product()
-        .map(|v| v.iter().cloned().tuple_windows::<DiffSeq>().next().unwrap())
-        .collect_vec();
-
-    println!("Finding maximum sequence...");
-    let m = seqs
+    let secrets: Vec<Vec<u64>> = seeds
         .par_iter()
-        .max_by_key(|seq| total_buys(&secrets, &diffs, seq));
+        .map(|&s| secrets(s, n_folds).collect_vec())
+        .collect();
+
+    let m = secrets.par_iter().map(buys).collect();
+    let summed = sum_by_key(&m);
+    let m = summed.iter().max_by_key(|(_, v)| *v);
     match m {
-        Some(seq) => (total_buys(&secrets, &diffs, seq), Some(*seq)),
+        Some((seq, v)) => (*v, Some(*seq)),
         None => (0, None),
     }
 }
