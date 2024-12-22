@@ -8,6 +8,7 @@ regex = "1.0.0"
 itertools = "*"
 nom = "7.0.0"
 num = "*"
+rayon = "1.10"
 
 [dependencies.coordinates]
 path = "../../coordinates.rs"
