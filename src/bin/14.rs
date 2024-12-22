@@ -5,7 +5,7 @@ use ::std::cmp::Ordering::*;
 use itertools::Itertools;
 use nom::{
     bytes::complete::tag,
-    character::complete::{char, i32, newline, space1},
+    character::complete::{char, i64, newline, space1},
     combinator::map,
     multi::separated_list1,
     sequence::{preceded, separated_pair},
@@ -13,19 +13,18 @@ use nom::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-use coordinates::two_dimensional::Vector2;
-type Coordinates = Vector2<i32>;
+use aoclib::grid::IPoint;
 
 #[derive(Debug)]
 struct Robot {
-    p: Coordinates,
-    v: Coordinates,
+    p: IPoint,
+    v: IPoint,
 }
 
-fn coords(input: &str) -> IResult<&str, Coordinates> {
-    map(separated_pair(i32, char(','), i32), |(x, y)| Coordinates {
-        x,
-        y,
+fn coords(input: &str) -> IResult<&str, IPoint> {
+    map(separated_pair(i64, char(','), i64), |(x, y)| IPoint {
+        x: x as isize,
+        y: y as isize,
     })(input)
 }
 
@@ -40,8 +39,8 @@ fn robot(input: &str) -> IResult<&str, Robot> {
     )(input)
 }
 
-fn move_robot(r: &Robot, t: i32, (w, h): (i32, i32)) -> Coordinates {
-    Coordinates {
+fn move_robot(r: &Robot, t: isize, (w, h): (isize, isize)) -> IPoint {
+    IPoint {
         x: (r.p.x + r.v.x * t).rem_euclid(w),
         y: (r.p.y + r.v.y * t).rem_euclid(h),
     }
@@ -97,7 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|y| {
                 (0..w)
                     .map(|x| {
-                        if uniq.contains(&Coordinates { x, y }) {
+                        if uniq.contains(&IPoint { x, y }) {
                             '*'
                         } else {
                             '.'

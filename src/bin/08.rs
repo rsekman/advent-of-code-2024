@@ -5,14 +5,13 @@ use std::io::prelude::*;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 
-use coordinates::two_dimensional::Vector2;
-type Point = Vector2<isize>;
+use aoclib::grid::IPoint;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let stdin = std::io::stdin();
     let stdin = stdin.lock();
 
-    let mut antennae = HashMap::<char, HashSet<Point>>::new();
+    let mut antennae = HashMap::<char, HashSet<IPoint>>::new();
     let mut size = (0, 0);
     for (row, line) in stdin.lines().enumerate() {
         for (col, c) in line?.chars().enumerate() {
@@ -29,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let size = (size.0 as isize, size.1 as isize);
 
-    let validate_antinode = |n: Point| {
+    let validate_antinode = |n: IPoint| {
         if 0 <= n.x && n.x < size.0 as isize && 0 <= n.y && n.y < size.1 {
             Some(n)
         } else {
@@ -37,11 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let mut antinodes = HashSet::<Point>::new();
-    let mut antinodes_harmonics = HashSet::<Point>::new();
+    let mut antinodes = HashSet::<IPoint>::new();
+    let mut antinodes_harmonics = HashSet::<IPoint>::new();
 
     let mut add_antinode = |n| antinodes.insert(n);
-    let mut add_resonant_antinodes = |start: Point, delta: Point| {
+    let mut add_resonant_antinodes = |start: IPoint, delta: IPoint| {
         std::iter::repeat(delta).fold_while(start, |n, d| {
             antinodes_harmonics.insert(n);
             validate_antinode(n + d).map(Continue).unwrap_or(Done(n))

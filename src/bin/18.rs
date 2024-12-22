@@ -11,25 +11,10 @@ use nom::{
     IResult,
 };
 
-use aoclib::dijkstra::dijkstra;
-use coordinates::two_dimensional::Vector2;
-use num::traits::{CheckedAdd, CheckedSub};
-
-type Point = Vector2<usize>;
-
-fn neighbors(p: &Point, (w, h): (usize, usize)) -> Vec<Point> {
-    vec![
-        p.checked_add(&(1, 0).into()),
-        p.checked_sub(&(1, 0).into()),
-        p.checked_add(&(0, 1).into()),
-        p.checked_sub(&(0, 1).into()),
-    ]
-    .iter()
-    .filter_map(|q| *q)
-    .filter(|q| q.x <= w && q.y <= h)
-    .collect()
-}
-
+use aoclib::{
+    dijkstra::dijkstra,
+    grid::{neighbors_within_bounds, Point},
+};
 fn parse_input(input: &str) -> IResult<&str, Vec<Point>> {
     separated_list1(
         newline,
@@ -45,7 +30,7 @@ fn accessible(
     bounds: (usize, usize),
     blocked: &BTreeSet<Point>,
 ) -> Vec<(Point, usize)> {
-    neighbors(&pos, bounds)
+    neighbors_within_bounds(&pos, bounds)
         .iter()
         .filter(|n| !blocked.contains(&n))
         .map(|p| (*p, 1))

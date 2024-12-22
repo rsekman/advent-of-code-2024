@@ -2,22 +2,11 @@ use std::error::Error;
 use std::io::prelude::*;
 
 use itertools::{Itertools, MinMaxResult};
-use num::traits::{CheckedAdd, CheckedSub};
 use std::collections::{HashMap, HashSet};
 
-use coordinates::two_dimensional::Vector2;
-type Point = Vector2<isize>;
+use aoclib::grid::{neighbors, IPoint};
 
-fn neighbors(p: Point) -> Vec<Point> {
-    vec![
-        p + (1isize, 0isize).into(),
-        p + (-1isize, 0isize).into(),
-        p + (0isize, 1isize).into(),
-        p + (0isize, -1isize).into(),
-    ]
-}
-
-fn connected_component(p: Point, garden: &HashMap<Point, char>) -> Option<HashSet<Point>> {
+fn connected_component(p: IPoint, garden: &HashMap<IPoint, char>) -> Option<HashSet<IPoint>> {
     let mut component = HashSet::new();
     let c = garden.get(&p);
     if !c.is_some() {
@@ -37,7 +26,7 @@ fn connected_component(p: Point, garden: &HashMap<Point, char>) -> Option<HashSe
     Some(component)
 }
 
-fn perimiter(region: &HashSet<Point>) -> usize {
+fn perimiter(region: &HashSet<IPoint>) -> usize {
     let mut out = 0;
     for p in region.iter() {
         for q in neighbors(*p) {
@@ -49,7 +38,7 @@ fn perimiter(region: &HashSet<Point>) -> usize {
     out
 }
 
-fn n_sides(region: &HashSet<Point>) -> usize {
+fn n_sides(region: &HashSet<IPoint>) -> usize {
     let (north, south) = match region.iter().minmax_by_key(|c| c.y) {
         MinMaxResult::OneElement(m) => (m.y, m.y),
         MinMaxResult::MinMax(n, s) => (n.y, s.y),
@@ -103,12 +92,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stdin = std::io::stdin();
     let stdin = stdin.lock();
 
-    let mut garden: HashMap<Point, char> = HashMap::new();
+    let mut garden: HashMap<IPoint, char> = HashMap::new();
     for (row, line) in stdin.lines().enumerate() {
         let line = line?;
         garden.extend(line.chars().enumerate().map(|(col, c)| {
             (
-                Point {
+                IPoint {
                     x: col as isize,
                     y: row as isize,
                 },
@@ -117,8 +106,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }));
     }
 
-    let mut visited: HashSet<Point> = HashSet::new();
-    let mut components: Vec<HashSet<Point>> = Vec::new();
+    let mut visited: HashSet<IPoint> = HashSet::new();
+    let mut components: Vec<HashSet<IPoint>> = Vec::new();
     for (k, _) in garden.iter() {
         if visited.contains(k) {
             continue;
