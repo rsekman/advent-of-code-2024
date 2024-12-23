@@ -71,11 +71,11 @@ pub fn neighbors_unbounded(p: &UPoint) -> Vec<UPoint> {
     .collect()
 }
 
-pub fn neighbors(p: IPoint) -> Vec<IPoint> {
+pub fn neighbors(p: &IPoint) -> Vec<IPoint> {
     vec![
-        p + (1isize, 0isize).into(),
-        p + (-1isize, 0isize).into(),
-        p + (0isize, 1isize).into(),
-        p + (0isize, -1isize).into(),
+        *p + (1isize, 0isize).into(),
+        *p + (-1isize, 0isize).into(),
+        *p + (0isize, 1isize).into(),
+        *p + (0isize, -1isize).into(),
     ]
 }
