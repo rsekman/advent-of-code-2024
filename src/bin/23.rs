@@ -62,27 +62,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         computers.insert(r);
     }
 
+    let mut cache = BTreeMap::new();
+
     let identifier = 't';
     let n_cliques = computers
         .iter()
-        .combinations(3)
-        .map(|v| v.iter().cloned().collect_tuple().unwrap())
-        .filter(|(a, b, c)| {
-            a.starts_with(identifier) || b.starts_with(identifier) || c.starts_with(identifier)
-        })
-        .filter(|(&a, &b, &c)| {
-            lan.get(a).unwrap().contains(b)
-                && lan.get(a).unwrap().contains(c)
-                && lan.get(b).unwrap().contains(c)
-        })
-        .count();
+        .filter(|c| c.starts_with(identifier))
+        .flat_map(|c| cliques(c, &lan, 2, &mut cache))
+        .collect::<BTreeSet<_>>();
     println!(
-        "Number of 3-cliques with at least one computer beginning with {identifier}: {n_cliques}",
+        "Number of 3-cliques with at least one computer beginning with {identifier}: {}",
+        n_cliques.len()
     );
 
     let mut largest_clique = BTreeSet::<&str>::new();
-    let mut cache = BTreeMap::new();
-    for (j, c) in computers.iter().enumerate() {
+    for c in computers.iter() {
         let max_depth = lan.get(c).unwrap().len();
         let largest = (0..max_depth)
             .flat_map(|d| cliques(c, &lan, d, &mut cache))
@@ -91,7 +85,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             && lrg.len() > largest_clique.len()
         {
             largest_clique = lrg.clone();
-            println!("New largest clique found for {c}: {largest_clique:?}");
         }
     }
     println!("LAN password: {}", largest_clique.iter().join(","));
