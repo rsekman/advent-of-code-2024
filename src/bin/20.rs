@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::io::prelude::*;
 
+use rayon::prelude::*;
+
 use aoclib::{
     dijkstra::{dijkstra, DijkstraPath},
     grid::{neighbors, IPoint},
@@ -30,21 +32,25 @@ fn cheats(
     cheat_dist: usize,
     cutoff: usize,
 ) -> usize {
-    let mut n = 0;
     let cutoff = cutoff as isize;
-    for p in path.path.iter() {
-        for c in cheat(&p.pos, cheat_dist) {
-            if let Some(d) = dist_map.get(&c) {
-                let IPoint { x: dx, y: dy } = p.pos - c;
-                let cheat_time = dx.abs() + dy.abs();
-                let saved_time = (d.wrapping_sub(p.dist) as isize) - cheat_time;
-                if saved_time >= cutoff {
-                    n += 1
-                }
-            }
-        }
-    }
-    n
+    let v: Vec<_> = path.path.clone().into();
+    v.par_iter()
+        .map(|p| {
+            cheat(&p.pos, cheat_dist)
+                .par_iter()
+                .map(|c| {
+                    if let Some(d) = dist_map.get(&c) {
+                        let IPoint { x: dx, y: dy } = p.pos - *c;
+                        let cheat_time = dx.abs() + dy.abs();
+                        (d.wrapping_sub(p.dist) as isize) - cheat_time
+                    } else {
+                        0
+                    }
+                })
+                .filter(|t| *t >= cutoff)
+                .count()
+        })
+        .sum::<usize>()
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
