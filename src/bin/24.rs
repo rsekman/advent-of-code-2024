@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::iproduct;
 
+// DATA TYPES
+
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -17,7 +19,7 @@ use nom::{
     IResult,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 enum Op {
     And,
     Or,
@@ -25,7 +27,6 @@ enum Op {
 }
 
 type ComponentRef = Rc<RefCell<Component>>;
-#[derive(Debug)]
 enum Component {
     Wire {
         value: bool,
@@ -62,12 +63,21 @@ impl Component {
 }
 type Netlist<'a> = BTreeMap<&'a str, ComponentRef>;
 
-#[derive(Debug)]
 enum RawComponent<'a> {
     Wire(&'a str, bool),
     Gate(&'a str, &'a str, Op, &'a str),
 }
+impl<'a> RawComponent<'a> {
+    fn name(&self) -> &'a str {
+        match self {
+            RawComponent::Wire(n, _) => n,
+            RawComponent::Gate(n, _, _, _) => n,
+        }
+    }
+}
 type RawNetlist<'a> = BTreeMap<&'a str, RawComponent<'a>>;
+
+// PARSERS
 
 fn parse_wire(input: &str) -> IResult<&str, RawComponent> {
     map(
@@ -103,39 +113,55 @@ fn parse_component(input: &str) -> IResult<&str, RawComponent> {
     alt((parse_wire, parse_gate))(input)
 }
 
-fn parse_input(input: &str) -> IResult<&str, Vec<RawComponent>> {
-    separated_list0(newline, opt(parse_component))(&input)
-        .map(|(s, v)| (s, v.into_iter().filter_map(|x| x).collect()))
+fn parse_rawnetlist<'a>(input: &'a str) -> IResult<&str, RawNetlist<'a>> {
+    separated_list0(newline, opt(parse_component))(&input).map(|(s, v)| {
+        (
+            s,
+            v.into_iter()
+                .filter_map(|x| x)
+                .map(|c| (c.name(), c))
+                .collect(),
+        )
+    })
 }
 
+// Topologically sort a RawNetlist, i.e. a graph of gates and wires identified by strings
 fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> {
     use RawComponent::*;
-    let mut vs = BTreeSet::new();
+    let mut vs = BTreeSet::new(); // Visited components
 
+    // Post-order depth first traveral gives a valid topological order
     let mut stack: Vec<&'a str> = netlist.iter().map(|(&k, _)| k).collect();
     let mut out = Vec::new();
     while stack.len() > 0 {
         let &v = stack.last().unwrap();
         if vs.contains(&v) {
+            // This component has already been visited
             stack.pop();
             continue;
         }
         let c = netlist.get(v).unwrap();
         match c {
+            // Wires are leaves
             Wire(_, _) => {
                 out.push(c);
                 vs.insert(v);
                 stack.pop();
             }
             Gate(_, left, _, right) => {
-                if !vs.contains(left) && netlist.contains_key(left) {
-                    stack.push(left);
+                // *Post-order* traversal; see also solution to day 05
+                let f = |&n| {
+                    if !vs.contains(n) && netlist.contains_key(n) {
+                        stack.push(n);
+                        true
+                    } else {
+                        false
+                    }
+                };
+                if vec![left, right].into_iter().any(f) {
                     continue;
                 }
-                if !vs.contains(right) && netlist.contains_key(right) {
-                    stack.push(right);
-                    continue;
-                }
+                // Both children are marked visited, now we can visit this node
                 out.push(c);
                 vs.insert(v);
                 stack.pop();
@@ -145,47 +171,26 @@ fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> 
     out
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let stdin = std::io::stdin();
-    let mut stdin = stdin.lock();
-    let mut input = String::new();
-    stdin.read_to_string(&mut input)?;
-
-    let mut raw_netlist = RawNetlist::new();
-    let (_, parsed) = parse_input(&input).map_err(|e| format!("Invalid input: {e}"))?;
-    for c in parsed {
-        use RawComponent::*;
-        match c {
-            Wire(n, _) => raw_netlist.insert(n, c),
-            Gate(n, _, _, _) => raw_netlist.insert(n, c),
-        };
-    }
-
+fn build_netlist<'a>(raw: &'a RawNetlist<'a>) -> Result<Netlist<'a>, String> {
     let mut netlist = Netlist::new();
-    let sorted = sort_topologically(&raw_netlist);
+    let sorted = sort_topologically(&raw);
     for c in sorted {
         match c {
             RawComponent::Wire(n, v) => {
                 netlist.insert(n, RefCell::new(Component::Wire { value: *v }).into())
             }
             RawComponent::Gate(out, l, op, r) => {
-                let left = netlist
-                    .get(l)
-                    .ok_or(format!(
-                        "Invalid netlist: {out} needs input {l}, but {l} is not in the netlist."
-                    ))?
-                    .clone();
-                let right = netlist
-                    .get(r)
-                    .ok_or(format!(
-                        "Invalid netlist: {out} needs input {l}, but {l} is not in the netlist."
-                    ))?
-                    .clone();
+                let get = |v| {
+                    netlist.get(v).ok_or(format!(
+                        "Invalid netlist: {out} needs input {v}, but {v} is not in the netlist."
+                    ))
+                };
+
                 netlist.insert(
                     out,
                     RefCell::new(Component::Gate {
-                        left,
-                        right,
+                        left: get(l)?.clone(),
+                        right: get(r)?.clone(),
                         op: *op,
                     })
                     .into(),
@@ -193,6 +198,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         };
     }
+    Ok(netlist)
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let stdin = std::io::stdin();
+    let mut stdin = stdin.lock();
+    let mut input = String::new();
+    stdin.read_to_string(&mut input)?;
+
+    let (_, raw_netlist) = parse_rawnetlist(&input).map_err(|e| format!("Invalid input: {e}"))?;
+    let netlist = build_netlist(&raw_netlist)?;
 
     let mut out = 0;
     let mut n_bits_out = 0;
