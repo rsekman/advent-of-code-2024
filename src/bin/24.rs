@@ -113,7 +113,7 @@ fn parse_component(input: &str) -> IResult<&str, RawComponent> {
     alt((parse_wire, parse_gate))(input)
 }
 
-fn parse_rawnetlist<'a>(input: &'a str) -> IResult<&str, RawNetlist<'a>> {
+fn parse_rawnetlist(input: &str) -> IResult<&str, RawNetlist> {
     separated_list0(newline, opt(parse_component))(&input).map(|(s, v)| {
         (
             s,
@@ -171,34 +171,39 @@ fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> 
     out
 }
 
+// Build a RawNetlist into a Netlist, i.e., a graph of gates and wires connected by Rc<RefCell<_>>:s
 fn build_netlist<'a>(raw: &'a RawNetlist<'a>) -> Result<Netlist<'a>, String> {
-    let mut netlist = Netlist::new();
-    let sorted = sort_topologically(&raw);
-    for c in sorted {
-        match c {
-            RawComponent::Wire(n, v) => {
-                netlist.insert(n, RefCell::new(Component::Wire { value: *v }).into())
-            }
-            RawComponent::Gate(out, l, op, r) => {
-                let get = |v| {
-                    netlist.get(v).ok_or(format!(
-                        "Invalid netlist: {out} needs input {v}, but {v} is not in the netlist."
-                    ))
-                };
-
-                netlist.insert(
-                    out,
-                    RefCell::new(Component::Gate {
-                        left: get(l)?.clone(),
-                        right: get(r)?.clone(),
-                        op: *op,
-                    })
-                    .into(),
-                )
-            }
+    // The Netlist cannot be built with try_collect() because the dependencies of a node must exist
+    // in the netlist before that node can be inserted, but it can be built with
+    // try_fold()!
+    let to_rcrc = |c| Rc::new(RefCell::new(c));
+    let work = |mut netlist: Netlist<'a>, c: &RawComponent<'a>| {
+        let get_or_err = |v, out| {
+            netlist
+                .get(v)
+                .ok_or(format!(
+                    "Invalid netlist: {out} needs input {v}, but {v} is not in the netlist."
+                ))
+                .map(Rc::clone)
         };
-    }
-    Ok(netlist)
+        match c {
+            RawComponent::Wire(n, v) => netlist.insert(n, to_rcrc(Wire { value: *v })),
+            RawComponent::Gate(out, l, op, r) => netlist.insert(
+                out,
+                to_rcrc(Gate {
+                    left: get_or_err(l, out)?,
+                    right: get_or_err(r, out)?,
+                    op: *op,
+                }),
+            ),
+        };
+        Ok(netlist)
+    };
+
+    use Component::*;
+    sort_topologically(&raw)
+        .into_iter()
+        .try_fold(Netlist::new(), work)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
