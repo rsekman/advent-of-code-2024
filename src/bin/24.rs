@@ -150,7 +150,7 @@ fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> 
             }
             Gate(_, left, _, right) => {
                 // *Post-order* traversal; see also solution to day 05
-                let f = |&n| {
+                let push_child = |&n| {
                     if !vs.contains(n) && netlist.contains_key(n) {
                         stack.push(n);
                         true
@@ -158,7 +158,7 @@ fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> 
                         false
                     }
                 };
-                if vec![left, right].into_iter().any(f) {
+                if vec![left, right].into_iter().any(push_child) {
                     continue;
                 }
                 // Both children are marked visited, now we can visit this node
