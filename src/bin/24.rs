@@ -7,8 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::iproduct;
 
-// DATA TYPES
-
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -19,6 +17,8 @@ use nom::{
     IResult,
 };
 
+// DATA TYPES
+
 #[derive(Copy, Clone)]
 enum Op {
     And,
@@ -26,6 +26,8 @@ enum Op {
     Xor,
 }
 
+// Enum for the Components of a circuit, i.e. Gates and incoming Wires
+// The Rc<RefCell<_>> pattern allows mutable access to the Components.
 type ComponentRef = Rc<RefCell<Component>>;
 enum Component {
     Wire {
@@ -37,8 +39,12 @@ enum Component {
         op: Op,
     },
 }
+// A backtrace from a single Component can be easily built by tree traversal, but if we want the
+// full DAG we'll need to put the Components into something that can be indexed
+type Netlist<'a> = BTreeMap<&'a str, ComponentRef>;
 
 impl Component {
+    // Set the value of a Wire. Does nothing if the Component is a Gate.
     fn set(&mut self, new: bool) {
         match self {
             Component::Wire { value } => *value = new,
@@ -51,6 +57,10 @@ impl Component {
         match self {
             Wire { value } => *value,
             Gate { left, right, op } => {
+                // If the upstream values could not change, it would make sense to cache the result
+                // of eval() in the Gate itself. Because upstream values *are* mutable, we
+                // cannot do this and must re-evaluate the whole chain anew on each call.
+                // Of course, cache invalidation could be implemented.
                 let (lv, rv) = (left.borrow().eval(), right.borrow().eval());
                 match op {
                     Op::Or => lv || rv,
@@ -61,8 +71,8 @@ impl Component {
         }
     }
 }
-type Netlist<'a> = BTreeMap<&'a str, ComponentRef>;
 
+// A RawComponent is a Component referring to its inputs by their names
 enum RawComponent<'a> {
     Wire(&'a str, bool),
     Gate(&'a str, &'a str, Op, &'a str),
@@ -124,6 +134,8 @@ fn parse_rawnetlist(input: &str) -> IResult<&str, RawNetlist> {
         )
     })
 }
+
+// LIBRARY
 
 // Topologically sort a RawNetlist, i.e. a graph of gates and wires identified by strings
 fn sort_topologically<'a>(netlist: &'a RawNetlist) -> Vec<&'a RawComponent<'a>> {
@@ -225,7 +237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             n_bits_out += 1;
         }
     }
-    println!("Output: {out}");
+    println!("Output number: {out}");
 
     /* To solve part 2:
      * The code below tries adding (a << n) + (b << n) where a and b are 0 or 1.
